@@ -3,116 +3,21 @@ import { chromium } from 'playwright';
 class TestRunner {
   async runTest(testCase, io = null) {
     const startTime = Date.now();
-    const browser = await chromium.launch();
-    const context = await browser.createContext();
-    const page = await context.newPage();
-    
+    let browser = null;
     const capturedEvents = [];
     const errors = [];
 
-    // Inject Piano event listener
-    await page.addInitScript(() => {
-      if (window.tpq) {
-        window.capturedPianoEvents = [];
-        const originalTrack = window.tpq.track;
-        window.tpq.track = function(...args) {
-          window.capturedPianoEvents.push({
-            timestamp: new Date().toISOString(),
-            args: args
-          });
-          return originalTrack.apply(this, args);
-        };
-      }
-    });
-
     try {
-      // Navigate to the test page
-      await page.goto(testCase.url, { waitUntil: 'networkidle' });
-      
-      // Wait for events to fire
-      await page.waitForTimeout(2000);
+      browser = await chromium.launch({ headless: true });
+      const context = await browser.createContext();
+      const page = await context.newPage();
 
-      // Capture events
-      const events = await page.evaluate(() => {
-        return window.capturedPianoEvents || [];
-      });
-
-      capturedEvents.push(...events);
-
-      // Validate events
-      const expectedEvents = testCase.expected_events || [];
-      const validation = this.validateEvents(events, expectedEvents);
-
-      await browser.close();
-
-      const durationMs = Date.now() - startTime;
-      const status = validation.passed ? 'pass' : 'fail';
-
-      const result = {
-        status,
-        capturedEvents,
-        errors: validation.failed,
-        durationMs,
-        validation
-      };
-
-      if (io) {
-        io.emit('test-result', result);
-      }
-
-      return result;
-    } catch (error) {
-      errors.push({
-        type: 'execution-error',
-        message: error.message,
-        stack: error.stack
-      });
-
-      await browser.close();
-
-      return {
-        status: 'fail',
-        capturedEvents,
-        errors,
-        durationMs: Date.now() - startTime
-      };
-    }
-  }
-
-  validateEvents(captured, expected) {
-    const passed = expected.length === captured.length;
-    const failed = [];
-
-    if (!passed) {
-      failed.push({
-        type: 'count-mismatch',
-        message: `Expected ${expected.length} events, got ${captured.length}`
-      });
-    }
-
-    expected.forEach((expectedEvent, idx) => {
-      if (idx < captured.length) {
-        const capturedEvent = captured[idx];
-        if (!this.eventsMatch(expectedEvent, capturedEvent)) {
-          failed.push({
-            type: 'payload-mismatch',
-            index: idx,
-            expected: expectedEvent,
-            captured: capturedEvent
-          });
-        }
-      }
-    });
-
-    return { passed: failed.length === 0, failed };
-  }
-
-  eventsMatch(expected, captured) {
-    // Simple payload comparison - can be enhanced
-    if (expected.type && captured.args[0] !== expected.type) return false;
-    if (expected.event && !captured.args[1]?.event?.includes(expected.event)) return false;
-    return true;
-  }
-}
-
-export default TestRunner;
+      // Inject Piano event listener and global tracking
+      await page.addInitScript(() => {
+        window.capturedPianoEvents = [];
+        window.tpq = window.tpq || { track: () => {} };
+        
+        const originalTrack = window.tpq.track;
+        
+        window.tpq.track = function(...args) {
+          const event = {\n            timestamp: new Date().toISOString(),\n            type: args[0] || 'unknown',\n            payload: args[1] || {},\n            rawArgs: args\n          };\n          window.capturedPianoEvents.push(event);\n          console.log('[Piano Event Captured]', event);\n          return originalTrack ? originalTrack.apply(this, args) : null;\n        };\n        \n        // Also capture through window.piano if it exists\n        if (window.piano && typeof window.piano.track === 'function') {\n          const originalPianoTrack = window.piano.track;\n          window.piano.track = function(...args) {\n            const event = {\n              timestamp: new Date().toISOString(),\n              type: args[0] || 'unknown',\n              payload: args[1] || {},\n              rawArgs: args\n            };\n            window.capturedPianoEvents.push(event);\n            console.log('[Piano.track Event Captured]', event);\n            return originalPianoTrack.apply(this, args);\n          };\n        }\n      });\n\n      // Set a longer timeout for page load\n      page.setDefaultTimeout(30000);\n      page.setDefaultNavigationTimeout(30000);\n\n      // Navigate to the test page\n      console.log(`[TestRunner] Starting test: ${testCase.name}`);\n      console.log(`[TestRunner] Navigating to: ${testCase.url}`);\n      \n      try {\n        await page.goto(testCase.url, { \n          waitUntil: 'networkidle',\n          timeout: 20000\n        });\n      } catch (navError) {\n        console.warn(`[TestRunner] Navigation timeout or error: ${navError.message}`);\n        // Continue anyway - page may still have loaded partially\n      }\n      \n      // Wait for potential Piano events to fire\n      await page.waitForTimeout(3000);\n\n      // Capture events\n      const events = await page.evaluate(() => {\n        return window.capturedPianoEvents || [];\n      });\n\n      capturedEvents.push(...events);\n      console.log(`[TestRunner] Captured ${events.length} events`);\n\n      // Validate events\n      const expectedEvents = testCase.expected_events || [];\n      const validation = this.validateEvents(events, expectedEvents);\n\n      await context.close();\n\n      const durationMs = Date.now() - startTime;\n      const status = validation.passed ? 'pass' : 'fail';\n\n      const result = {\n        status,\n        capturedEvents,\n        errors: validation.failed,\n        durationMs,\n        validation\n      };\n\n      console.log(`[TestRunner] Test ${status}: ${testCase.name}`);\n\n      if (io) {\n        io.emit('test-result', result);\n      }\n\n      return result;\n    } catch (error) {\n      console.error(`[TestRunner] Error executing test: ${error.message}`);\n      errors.push({\n        type: 'execution-error',\n        message: error.message,\n        stack: error.stack\n      });\n\n      return {\n        status: 'fail',\n        capturedEvents,\n        errors,\n        durationMs: Date.now() - startTime\n      };\n    } finally {\n      if (browser) {\n        await browser.close();\n      }\n    }\n  }\n\n  validateEvents(captured, expected) {\n    const failed = [];\n\n    // Check if we have the expected number of events\n    if (captured.length !== expected.length) {\n      failed.push({\n        type: 'count-mismatch',\n        message: `Expected ${expected.length} events, got ${captured.length}`,\n        expected: expected.length,\n        actual: captured.length\n      });\n    }\n\n    // Validate each expected event\n    expected.forEach((expectedEvent, idx) => {\n      if (idx >= captured.length) {\n        failed.push({\n          type: 'missing-event',\n          message: `Expected event at index ${idx} not found`,\n          index: idx,\n          expected: expectedEvent\n        });\n        return;\n      }\n\n      const capturedEvent = captured[idx];\n      const errors = this.compareEvents(expectedEvent, capturedEvent, idx);\n      if (errors.length > 0) {\n        failed.push(...errors);\n      }\n    });\n\n    return { \n      passed: failed.length === 0, \n      failed,\n      summary: {\n        total: expected.length,\n        matched: captured.length - failed.filter(e => e.type === 'payload-mismatch').length,\n        errors: failed.length\n      }\n    };\n  }\n\n  compareEvents(expected, captured, index) {\n    const errors = [];\n\n    // Type check\n    if (expected.type && captured.type !== expected.type) {\n      errors.push({\n        type: 'type-mismatch',\n        index,\n        message: `Event type mismatch: expected \"${expected.type}\", got \"${captured.type}\"`,\n        expected: expected.type,\n        actual: captured.type\n      });\n    }\n\n    // EventName check in payload\n    if (expected.eventName) {\n      const capturedEventName = captured.payload?.eventName || captured.rawArgs?.[1]?.eventName;\n      if (capturedEventName !== expected.eventName) {\n        errors.push({\n          type: 'payload-mismatch',\n          index,\n          field: 'eventName',\n          message: `Event name mismatch: expected \"${expected.eventName}\", got \"${capturedEventName}\"`,\n          expected: expected.eventName,\n          actual: capturedEventName\n        });\n      }\n    }\n\n    // Check any additional fields in expected\n    for (const [key, value] of Object.entries(expected)) {\n      if (['type', 'eventName'].includes(key)) continue;\n      \n      const capturedValue = captured.payload?.[key] || captured.rawArgs?.[1]?.[key];\n      if (capturedValue !== value) {\n        errors.push({\n          type: 'payload-mismatch',\n          index,\n          field: key,\n          message: `Field mismatch: expected ${key}=\"${value}\", got \"${capturedValue}\"`,\n          expected: value,\n          actual: capturedValue\n        });\n      }\n    }\n\n    return errors;\n  }\n}\n\nexport default TestRunner;\n
