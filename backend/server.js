@@ -7,6 +7,7 @@ import { dirname, join } from 'path';
 import Database from './db.js';
 import testRoutes from './routes/tests.js';
 import resultsRoutes from './routes/results.js';
+import demoRoutes from './routes/demo.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -35,6 +36,7 @@ app.locals.db = db;
 // Routes
 app.use('/api/tests', testRoutes);
 app.use('/api/results', resultsRoutes);
+app.use('/api/demo', demoRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
