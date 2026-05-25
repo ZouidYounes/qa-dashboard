@@ -1,0 +1,261 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background: #f5f5f5;
+}
+
+.container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+h1 {
+  color: #333;
+  margin-bottom: 30px;
+  font-size: 28px;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: 20px;
+}
+
+.sidebar {
+  background: white;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  height: fit-content;
+}
+
+.sidebar h2 {
+  font-size: 16px;
+  color: #666;
+  margin-bottom: 15px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.suite-item {
+  padding: 12px;
+  margin-bottom: 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: 2px solid transparent;
+}
+
+.suite-item:hover {
+  background: #f0f0f0;
+}
+
+.suite-item.active {
+  background: #e3f2fd;
+  border-color: #2196f3;
+}
+
+.suite-name {
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 4px;
+}
+
+.suite-desc {
+  font-size: 12px;
+  color: #999;
+}
+
+.content {
+  background: white;
+  border-radius: 8px;
+  padding: 30px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.content h2 {
+  font-size: 20px;
+  color: #333;
+  margin-bottom: 20px;
+}
+
+.test-cases {
+  display: grid;
+  gap: 20px;
+}
+
+.test-case-card {
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 20px;
+  background: #fafafa;
+  transition: all 0.2s;
+}
+
+.test-case-card:hover {
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.test-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.test-header h3 {
+  font-size: 16px;
+  color: #333;
+}
+
+.run-button {
+  padding: 8px 16px;
+  background: #4caf50;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.run-button:hover {
+  background: #45a049;
+}
+
+.run-button:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
+
+.test-url {
+  font-size: 13px;
+  color: #666;
+  margin-bottom: 15px;
+  font-family: 'Courier New', monospace;
+  word-break: break-all;
+}
+
+.results {
+  margin-top: 15px;
+  border-top: 1px solid #e0e0e0;
+  padding-top: 15px;
+}
+
+.results h4 {
+  font-size: 14px;
+  color: #666;
+  margin-bottom: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.result-item {
+  background: white;
+  border-left: 4px solid #2196f3;
+  padding: 12px;
+  margin-bottom: 10px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  flex-wrap: wrap;
+}
+
+.result-item.pass {
+  border-left-color: #4caf50;
+}
+
+.result-item.fail {
+  border-left-color: #f44336;
+}
+
+.status-badge {
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-weight: 600;
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+.result-item.pass .status-badge {
+  background: #c8e6c9;
+  color: #2e7d32;
+}
+
+.result-item.fail .status-badge {
+  background: #ffcdd2;
+  color: #c62828;
+}
+
+.duration {
+  font-size: 13px;
+  color: #999;
+  font-family: monospace;
+}
+
+.timestamp {
+  font-size: 12px;
+  color: #bbb;
+  margin-left: auto;
+}
+
+details {
+  width: 100%;
+  margin-top: 10px;
+}
+
+summary {
+  cursor: pointer;
+  color: #2196f3;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+summary:hover {
+  background: #f0f0f0;
+}
+
+pre {
+  background: #f5f5f5;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  padding: 12px;
+  margin-top: 10px;
+  font-size: 11px;
+  overflow-x: auto;
+  color: #333;
+}
+
+@media (max-width: 768px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+
+  .test-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .run-button {
+    align-self: flex-start;
+    margin-top: 10px;
+  }
+
+  .timestamp {
+    margin-left: 0;
+  }
+}
