@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
-import './App.css';
+import React, { useState, useEffect } from "react";
+import axios from "axios";
+import "./App.css";
 
 function App() {
   const [suites, setSuites] = useState([]);
@@ -10,6 +10,9 @@ function App() {
   const [loading, setLoading] = useState({});
   const [error, setError] = useState(null);
   const [seeding, setSeeding] = useState(false);
+  const [editingCase, setEditingCase] = useState(null);
+  const [editForm, setEditForm] = useState({});
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     fetchSuites();
@@ -17,21 +20,21 @@ function App() {
 
   const fetchSuites = async () => {
     try {
-      const response = await axios.get('/api/tests/suites');
+      const response = await axios.get("/api/tests/suites");
       setSuites(response.data || []);
     } catch (err) {
-      setError('Failed to fetch test suites: ' + err.message);
+      setError("Failed to fetch test suites: " + err.message);
     }
   };
 
   const seedDemoData = async () => {
     setSeeding(true);
     try {
-      const response = await axios.post('/api/demo/seed');
+      const response = await axios.post("/api/demo/seed");
       await fetchSuites();
       setError(null);
     } catch (err) {
-      setError('Failed to seed demo data: ' + err.message);
+      setError("Failed to seed demo data: " + err.message);
     } finally {
       setSeeding(false);
     }
@@ -42,38 +45,40 @@ function App() {
       const response = await axios.get(`/api/tests/suites/${suiteId}/cases`);
       setTestCases(response.data || []);
       setSelectedSuite(suiteId);
-      
+
       // Load results for all test cases
-      response.data.forEach(testCase => {
+      response.data.forEach((testCase) => {
         fetchResults(testCase.id);
       });
     } catch (err) {
-      setError('Failed to fetch test cases: ' + err.message);
+      setError("Failed to fetch test cases: " + err.message);
     }
   };
 
   const fetchResults = async (caseId) => {
     try {
       const response = await axios.get(`/api/results/cases/${caseId}`);
-      setResults(prev => ({
+      setResults((prev) => ({
         ...prev,
-        [caseId]: response.data || []
+        [caseId]: response.data || [],
       }));
     } catch (err) {
-      console.error('Error fetching results:', err);
+      console.error("Error fetching results:", err);
     }
   };
 
   const runTest = async (testCase) => {
-    setLoading(prev => ({ ...prev, [testCase.id]: true }));
+    setLoading((prev) => ({ ...prev, [testCase.id]: true }));
     setError(null);
     try {
-      const response = await axios.post('/api/tests/run', { testCaseId: testCase.id });
+      const response = await axios.post("/api/tests/run", {
+        testCaseId: testCase.id,
+      });
       await fetchResults(testCase.id);
     } catch (err) {
-      setError('Error running test: ' + err.message);
+      setError("Error running test: " + err.message);
     } finally {
-      setLoading(prev => ({ ...prev, [testCase.id]: false }));
+      setLoading((prev) => ({ ...prev, [testCase.id]: false }));
     }
   };
 
@@ -86,10 +91,10 @@ function App() {
   const getPassFailStats = () => {
     let passes = 0;
     let fails = 0;
-    Object.values(results).forEach(caseResults => {
-      caseResults.forEach(result => {
-        if (result.status === 'pass') passes++;
-        else if (result.status === 'fail') fails++;
+    Object.values(results).forEach((caseResults) => {
+      caseResults.forEach((result) => {
+        if (result.status === "pass") passes++;
+        else if (result.status === "fail") fails++;
       });
     });
     return { passes, fails };
@@ -97,17 +102,69 @@ function App() {
 
   const stats = getPassFailStats();
 
+  const startEdit = (testCase) => {
+    setEditingCase(testCase.id);
+    setEditForm({
+      url: testCase.url,
+      expected_events: JSON.stringify(testCase.expected_events || [], null, 2),
+    });
+  };
+
+  const cancelEdit = () => {
+    setEditingCase(null);
+    setEditForm({});
+  };
+
+  const saveEdit = async (testCaseId) => {
+    setSaving(true);
+    try {
+      // Validate JSON
+      let parsedEvents;
+      try {
+        parsedEvents = JSON.parse(editForm.expected_events);
+      } catch (e) {
+        setError("Invalid JSON for expected events: " + e.message);
+        setSaving(false);
+        return;
+      }
+
+      const response = await axios.put(`/api/tests/cases/${testCaseId}`, {
+        url: editForm.url,
+        expected_events: parsedEvents,
+      });
+
+      // Update the test case in state
+      setTestCases((prev) =>
+        prev.map((tc) =>
+          tc.id === testCaseId
+            ? { ...tc, url: editForm.url, expected_events: parsedEvents }
+            : tc,
+        ),
+      );
+
+      setEditingCase(null);
+      setEditForm({});
+      setError(null);
+    } catch (err) {
+      setError("Failed to save test case: " + err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <div className="container">
       <h1>🎹 QA Dashboard - Piano Event Testing</h1>
-      
+
       {error && (
         <div className="error-banner">
           {error}
-          <button onClick={() => setError(null)} className="close-btn">×</button>
+          <button onClick={() => setError(null)} className="close-btn">
+            ×
+          </button>
         </div>
       )}
-      
+
       <div className="layout">
         <aside className="sidebar">
           <div className="sidebar-header">
@@ -119,38 +176,38 @@ function App() {
               </div>
             )}
           </div>
-          
+
           <div className="suite-list">
             {suites.length === 0 ? (
               <div className="empty-suites">
                 <p>No test suites yet</p>
-                <button 
+                <button
                   onClick={seedDemoData}
                   disabled={seeding}
                   className="seed-button"
                 >
-                  {seeding ? 'Seeding...' : '📌 Create Demo Suite'}
+                  {seeding ? "Seeding..." : "📌 Create Demo Suite"}
                 </button>
               </div>
             ) : (
               <>
-                {suites.map(suite => (
+                {suites.map((suite) => (
                   <div
                     key={suite.id}
-                    className={`suite-item ${selectedSuite === suite.id ? 'active' : ''}`}
+                    className={`suite-item ${selectedSuite === suite.id ? "active" : ""}`}
                     onClick={() => fetchTestCases(suite.id)}
                   >
                     <div className="suite-name">{suite.name}</div>
                     <div className="suite-desc">{suite.description}</div>
                   </div>
                 ))}
-                <button 
+                <button
                   onClick={seedDemoData}
                   disabled={seeding}
                   className="seed-button-secondary"
                   title="Add another demo suite"
                 >
-                  {seeding ? '...' : '+ Demo'}
+                  {seeding ? "..." : "+ Demo"}
                 </button>
               </>
             )}
@@ -165,12 +222,15 @@ function App() {
                 {testCases.length === 0 ? (
                   <p className="empty-state">No test cases in this suite</p>
                 ) : (
-                  testCases.map(testCase => {
+                  testCases.map((testCase) => {
                     const latestResult = getLatestResult(testCase.id);
                     const resultStatus = latestResult?.status;
-                    
+
                     return (
-                      <div key={testCase.id} className={`test-case-card ${resultStatus ? resultStatus : ''}`}>
+                      <div
+                        key={testCase.id}
+                        className={`test-case-card ${resultStatus ? resultStatus : ""}`}
+                      >
                         <div className="test-header">
                           <div className="title-group">
                             <h3>{testCase.name}</h3>
@@ -180,49 +240,163 @@ function App() {
                               </span>
                             )}
                           </div>
-                          <button
-                            onClick={() => runTest(testCase)}
-                            disabled={loading[testCase.id]}
-                            className="run-button"
-                          >
-                            {loading[testCase.id] ? '⏳ Running...' : '▶ Run Test'}
-                          </button>
-                        </div>
-                        <div className="test-url">{testCase.url}</div>
-                        
-                        <details className="expected-events">
-                          <summary>📋 Expected Events ({testCase.expected_events?.length || 0})</summary>
-                          <pre>{JSON.stringify(testCase.expected_events || [], null, 2)}</pre>
-                        </details>
-                        
-                        {results[testCase.id] && results[testCase.id].length > 0 && (
-                          <div className="results">
-                            <h4>📊 Results History ({results[testCase.id].length})</h4>
-                            {results[testCase.id].slice(0, 10).map((result, idx) => (
-                              <div key={result.id} className={`result-item ${result.status}`}>
-                                <div className="result-meta">
-                                  <div className="status-badge">{result.status.toUpperCase()}</div>
-                                  <div className="duration">⏱ {result.duration_ms}ms</div>
-                                  <div className="timestamp">🕐 {new Date(result.run_at).toLocaleString()}</div>
-                                </div>
-                                
-                                {result.captured_events && result.captured_events.length > 0 && (
-                                  <details>
-                                    <summary>🎹 Captured Events ({result.captured_events.length})</summary>
-                                    <pre>{JSON.stringify(result.captured_events, null, 2)}</pre>
-                                  </details>
-                                )}
-                                
-                                {result.errors && result.errors.length > 0 && (
-                                  <details className="errors-section">
-                                    <summary>⚠️ Validation Errors ({result.errors.length})</summary>
-                                    <pre>{JSON.stringify(result.errors, null, 2)}</pre>
-                                  </details>
-                                )}
-                              </div>
-                            ))}
+                          <div className="test-header-buttons">
+                            <button
+                              onClick={() => runTest(testCase)}
+                              disabled={loading[testCase.id]}
+                              className="run-button"
+                            >
+                              {loading[testCase.id]
+                                ? "⏳ Running..."
+                                : "▶ Run Test"}
+                            </button>
+                            {editingCase !== testCase.id && (
+                              <button
+                                onClick={() => startEdit(testCase)}
+                                className="edit-button"
+                                title="Edit URL and expected events"
+                              >
+                                ✏️ Edit
+                              </button>
+                            )}
                           </div>
+                        </div>
+
+                        {editingCase === testCase.id ? (
+                          <div className="edit-form">
+                            <div className="form-group">
+                              <label>URL:</label>
+                              <input
+                                type="text"
+                                value={editForm.url || ""}
+                                onChange={(e) =>
+                                  setEditForm({
+                                    ...editForm,
+                                    url: e.target.value,
+                                  })
+                                }
+                                className="url-input"
+                              />
+                            </div>
+
+                            <div className="form-group">
+                              <label>Expected Events (JSON):</label>
+                              <textarea
+                                value={editForm.expected_events || ""}
+                                onChange={(e) =>
+                                  setEditForm({
+                                    ...editForm,
+                                    expected_events: e.target.value,
+                                  })
+                                }
+                                className="events-textarea"
+                                rows="8"
+                              />
+                            </div>
+
+                            <div className="form-buttons">
+                              <button
+                                onClick={() => saveEdit(testCase.id)}
+                                disabled={saving}
+                                className="save-button"
+                              >
+                                {saving ? "💾 Saving..." : "💾 Save"}
+                              </button>
+                              <button
+                                onClick={cancelEdit}
+                                disabled={saving}
+                                className="cancel-button"
+                              >
+                                ✕ Cancel
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            <div className="test-url">{testCase.url}</div>
+
+                            <details className="expected-events">
+                              <summary>
+                                📋 Expected Events (
+                                {testCase.expected_events?.length || 0})
+                              </summary>
+                              <pre>
+                                {JSON.stringify(
+                                  testCase.expected_events || [],
+                                  null,
+                                  2,
+                                )}
+                              </pre>
+                            </details>
+                          </>
                         )}
+
+                        {results[testCase.id] &&
+                          results[testCase.id].length > 0 && (
+                            <div className="results">
+                              <h4>
+                                📊 Results History (
+                                {results[testCase.id].length})
+                              </h4>
+                              {results[testCase.id]
+                                .slice(0, 10)
+                                .map((result, idx) => (
+                                  <div
+                                    key={result.id}
+                                    className={`result-item ${result.status}`}
+                                  >
+                                    <div className="result-meta">
+                                      <div className="status-badge">
+                                        {result.status.toUpperCase()}
+                                      </div>
+                                      <div className="duration">
+                                        ⏱ {result.duration_ms}ms
+                                      </div>
+                                      <div className="timestamp">
+                                        🕐{" "}
+                                        {new Date(
+                                          result.run_at,
+                                        ).toLocaleString()}
+                                      </div>
+                                    </div>
+
+                                    {result.captured_events &&
+                                      result.captured_events.length > 0 && (
+                                        <details>
+                                          <summary>
+                                            🎹 Captured Events (
+                                            {result.captured_events.length})
+                                          </summary>
+                                          <pre>
+                                            {JSON.stringify(
+                                              result.captured_events,
+                                              null,
+                                              2,
+                                            )}
+                                          </pre>
+                                        </details>
+                                      )}
+
+                                    {result.errors &&
+                                      result.errors.length > 0 && (
+                                        <details className="errors-section">
+                                          <summary>
+                                            ⚠️ Validation Errors (
+                                            {result.errors.length})
+                                          </summary>
+                                          <pre>
+                                            {JSON.stringify(
+                                              result.errors,
+                                              null,
+                                              2,
+                                            )}
+                                          </pre>
+                                        </details>
+                                      )}
+                                  </div>
+                                ))}
+                            </div>
+                          )}
                       </div>
                     );
                   })
@@ -236,4 +410,7 @@ function App() {
           )}
         </main>
       </div>
-    </div>\n  );\n}\n\nexport default App;\n
+    </div>
+  );
+}
+export default App;
